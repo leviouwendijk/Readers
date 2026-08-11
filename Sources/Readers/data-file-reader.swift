@@ -13,12 +13,20 @@ public struct DataFileReader: Sendable {
     public func read(
         options: DataReadOptions = .default
     ) throws -> DataReadResult {
-        let fileManager = FileManager.default
-        let exists = fileManager.fileExists(
-            atPath: url.path
-        )
+        let metadata: FileMetadataSnapshot
 
-        guard exists else {
+        do {
+            metadata = try FileInspector(
+                url
+            ).inspect()
+        } catch {
+            throw DataReadError.io(
+                url,
+                message: error.localizedDescription
+            )
+        }
+
+        guard metadata.existed else {
             switch options.missingFilePolicy {
             case .throwError:
                 throw DataReadError.fileNotFound(url)
@@ -29,12 +37,17 @@ public struct DataFileReader: Sendable {
                     data: Data(),
                     fileType: inferredFileType,
                     byteCount: 0,
-                    existed: false
+                    existed: false,
+                    fileSnapshot: .init(
+                        metadata: metadata,
+                        contentFingerprint: nil
+                    )
                 )
             }
         }
 
         let data: Data
+
         do {
             data = try Data(
                 contentsOf: url,
@@ -52,7 +65,13 @@ public struct DataFileReader: Sendable {
             data: data,
             fileType: inferredFileType,
             byteCount: data.count,
-            existed: true
+            existed: true,
+            fileSnapshot: .init(
+                metadata: metadata,
+                contentFingerprint: .fingerprint(
+                    for: data
+                )
+            )
         )
     }
 
@@ -69,7 +88,8 @@ public struct DataFileReader: Sendable {
             fileType: result.fileType,
             mediaType: inferredMediaType(from: result.fileType),
             byteCount: result.byteCount,
-            existed: result.existed
+            existed: result.existed,
+            fileSnapshot: result.fileSnapshot
         )
     }
 }

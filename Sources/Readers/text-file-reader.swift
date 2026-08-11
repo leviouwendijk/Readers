@@ -12,37 +12,39 @@ public struct TextFileReader: Sendable {
     public func read(
         options: TextReadOptions = .default
     ) throws -> TextReadResult {
-        let fileManager = FileManager.default
-        let exists = fileManager.fileExists(
-            atPath: url.path
-        )
+        let dataResult: DataReadResult
 
-        guard exists else {
-            switch options.missingFilePolicy {
-            case .throwError:
-                throw TextReadError.fileNotFound(url)
+        do {
+            dataResult = try DataFileReader(
+                url
+            ).read(
+                options: .init(
+                    missingFilePolicy: options.missingFilePolicy
+                )
+            )
+        } catch let error as DataReadError {
+            switch error {
+            case .fileNotFound(let url):
+                throw TextReadError.fileNotFound(
+                    url
+                )
 
-            case .returnEmpty:
-                return .init(
-                    url: url,
-                    text: "",
-                    encodingUsed: nil,
-                    byteCount: 0,
-                    existed: false
+            case .io(let url, let message):
+                throw TextReadError.io(
+                    url,
+                    message: message
                 )
             }
         }
 
-        let data: Data
-        do {
-            data = try Data(
-                contentsOf: url,
-                options: [.uncached]
-            )
-        } catch {
-            throw TextReadError.io(
-                url,
-                message: error.localizedDescription
+        guard dataResult.existed else {
+            return .init(
+                url: url,
+                text: "",
+                encodingUsed: nil,
+                byteCount: 0,
+                existed: false,
+                fileSnapshot: dataResult.fileSnapshot
             )
         }
 
@@ -50,7 +52,7 @@ public struct TextFileReader: Sendable {
 
         for encoding in attempted {
             if let decoded = String(
-                data: data,
+                data: dataResult.data,
                 encoding: encoding.foundation
             ) {
                 return .init(
@@ -60,8 +62,9 @@ public struct TextFileReader: Sendable {
                         using: options.newlineNormalization
                     ),
                     encodingUsed: encoding,
-                    byteCount: data.count,
-                    existed: true
+                    byteCount: dataResult.byteCount,
+                    existed: true,
+                    fileSnapshot: dataResult.fileSnapshot
                 )
             }
         }

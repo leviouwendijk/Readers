@@ -8,19 +8,22 @@ public struct TextReadResult: Sendable, Hashable, Codable {
     public let encodingUsed: TextEncoding?
     public let byteCount: Int
     public let existed: Bool
+    public let fileSnapshot: FileReadSnapshot?
 
     public init(
         url: URL,
         text: String,
         encodingUsed: TextEncoding?,
         byteCount: Int,
-        existed: Bool
+        existed: Bool,
+        fileSnapshot: FileReadSnapshot? = nil
     ) {
         self.url = url
         self.text = text
         self.encodingUsed = encodingUsed
         self.byteCount = byteCount
         self.existed = existed
+        self.fileSnapshot = fileSnapshot
     }
 
     public var isEmpty: Bool {
@@ -34,19 +37,22 @@ public struct LineReadResult: Sendable, Hashable, Codable {
     public let encodingUsed: TextEncoding?
     public let byteCount: Int
     public let existed: Bool
+    public let fileSnapshot: FileReadSnapshot?
 
     public init(
         url: URL,
         lines: [String],
         encodingUsed: TextEncoding?,
         byteCount: Int,
-        existed: Bool
+        existed: Bool,
+        fileSnapshot: FileReadSnapshot? = nil
     ) {
         self.url = url
         self.lines = lines
         self.encodingUsed = encodingUsed
         self.byteCount = byteCount
         self.existed = existed
+        self.fileSnapshot = fileSnapshot
     }
 
     public var lineCount: Int {
@@ -82,6 +88,7 @@ public struct LineSliceReadResult: Sendable, Hashable, Codable {
     public let encodingUsed: TextEncoding?
     public let byteCount: Int
     public let existed: Bool
+    public let fileSnapshot: FileReadSnapshot?
 
     public init(
         url: URL,
@@ -91,7 +98,8 @@ public struct LineSliceReadResult: Sendable, Hashable, Codable {
         truncated: Bool,
         encodingUsed: TextEncoding?,
         byteCount: Int,
-        existed: Bool
+        existed: Bool,
+        fileSnapshot: FileReadSnapshot? = nil
     ) {
         self.url = url
         self.selectedLines = selectedLines
@@ -101,6 +109,7 @@ public struct LineSliceReadResult: Sendable, Hashable, Codable {
         self.encodingUsed = encodingUsed
         self.byteCount = byteCount
         self.existed = existed
+        self.fileSnapshot = fileSnapshot
     }
 
     public var lineCount: Int {
@@ -122,19 +131,22 @@ public struct DataReadResult: Sendable, Hashable {
     public let fileType: AnyFileType?
     public let byteCount: Int
     public let existed: Bool
+    public let fileSnapshot: FileReadSnapshot?
 
     public init(
         url: URL,
         data: Data,
         fileType: AnyFileType?,
         byteCount: Int,
-        existed: Bool
+        existed: Bool,
+        fileSnapshot: FileReadSnapshot? = nil
     ) {
         self.url = url
         self.data = data
         self.fileType = fileType
         self.byteCount = byteCount
         self.existed = existed
+        self.fileSnapshot = fileSnapshot
     }
 
     public var isEmpty: Bool {
@@ -153,6 +165,7 @@ public struct Base64ReadResult: Sendable, Hashable, Codable {
     public let mediaType: String?
     public let byteCount: Int
     public let existed: Bool
+    public let fileSnapshot: FileReadSnapshot?
 
     public init(
         url: URL,
@@ -160,7 +173,8 @@ public struct Base64ReadResult: Sendable, Hashable, Codable {
         fileType: AnyFileType?,
         mediaType: String?,
         byteCount: Int,
-        existed: Bool
+        existed: Bool,
+        fileSnapshot: FileReadSnapshot? = nil
     ) {
         self.url = url
         self.base64 = base64
@@ -168,6 +182,7 @@ public struct Base64ReadResult: Sendable, Hashable, Codable {
         self.mediaType = mediaType
         self.byteCount = byteCount
         self.existed = existed
+        self.fileSnapshot = fileSnapshot
     }
 
     public var dataURL: String? {

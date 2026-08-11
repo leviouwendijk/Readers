@@ -22,7 +22,8 @@ public struct LineReader: Sendable {
             lines: splitLines(text.text),
             encodingUsed: text.encodingUsed,
             byteCount: text.byteCount,
-            existed: text.existed
+            existed: text.existed,
+            fileSnapshot: text.fileSnapshot
         )
     }
 
@@ -60,7 +61,8 @@ public struct LineReader: Sendable {
                 truncated: false,
                 encodingUsed: result.encodingUsed,
                 byteCount: result.byteCount,
-                existed: result.existed
+                existed: result.existed,
+                fileSnapshot: result.fileSnapshot
             )
         }
 
@@ -79,7 +81,8 @@ public struct LineReader: Sendable {
                 truncated: false,
                 encodingUsed: result.encodingUsed,
                 byteCount: result.byteCount,
-                existed: result.existed
+                existed: result.existed,
+                fileSnapshot: result.fileSnapshot
             )
         }
 
@@ -125,7 +128,8 @@ public struct LineReader: Sendable {
             truncated: truncated,
             encodingUsed: result.encodingUsed,
             byteCount: result.byteCount,
-            existed: result.existed
+            existed: result.existed,
+            fileSnapshot: result.fileSnapshot
         )
     }
 }
