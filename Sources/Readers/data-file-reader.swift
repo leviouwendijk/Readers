@@ -1,4 +1,5 @@
 import Foundation
+import IO
 import FileTypes
 
 public struct DataFileReader: Sendable {
@@ -23,6 +24,23 @@ public struct DataFileReader: Sendable {
             throw DataReadError.io(
                 url,
                 message: error.localizedDescription
+            )
+        }
+
+        return try read(
+            inspected: metadata,
+            options: options
+        )
+    }
+
+    public func read(
+        inspected metadata: FileMetadataSnapshot,
+        options: DataReadOptions = .default
+    ) throws -> DataReadResult {
+        guard metadata.url.standardizedFileURL == url.standardizedFileURL else {
+            throw DataReadError.io(
+                url,
+                message: "Inspected metadata URL does not match reader URL: \(metadata.url.path)"
             )
         }
 
@@ -51,7 +69,7 @@ public struct DataFileReader: Sendable {
         do {
             data = try Data(
                 contentsOf: url,
-                options: [.uncached]
+                options: options.cachePolicy.dataReadingOptions
             )
         } catch {
             throw DataReadError.io(
@@ -82,19 +100,55 @@ public struct DataFileReader: Sendable {
             options: options
         )
 
-        return .init(
+        return base64Result(
+            from: result
+        )
+    }
+
+    public func readBase64(
+        inspected metadata: FileMetadataSnapshot,
+        options: DataReadOptions = .default
+    ) throws -> Base64ReadResult {
+        let result = try read(
+            inspected: metadata,
+            options: options
+        )
+
+        return base64Result(
+            from: result
+        )
+    }
+}
+
+private extension FileReadCachePolicy {
+    var dataReadingOptions: Data.ReadingOptions {
+        switch self {
+        case .system:
+            return []
+
+        case .uncached:
+            return [.uncached]
+        }
+    }
+}
+
+private extension DataFileReader {
+    func base64Result(
+        from result: DataReadResult
+    ) -> Base64ReadResult {
+        .init(
             url: result.url,
             base64: result.base64,
             fileType: result.fileType,
-            mediaType: inferredMediaType(from: result.fileType),
+            mediaType: inferredMediaType(
+                from: result.fileType
+            ),
             byteCount: result.byteCount,
             existed: result.existed,
             fileSnapshot: result.fileSnapshot
         )
     }
-}
 
-private extension DataFileReader {
     var inferredFileType: AnyFileType? {
         try? AnyFileType(
             filename: url.lastPathComponent

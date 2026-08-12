@@ -1,4 +1,5 @@
 import Foundation
+import IO
 
 public struct TextFileReader: Sendable {
     public let url: URL
@@ -12,16 +13,52 @@ public struct TextFileReader: Sendable {
     public func read(
         options: TextReadOptions = .default
     ) throws -> TextReadResult {
-        let dataResult: DataReadResult
-
-        do {
-            dataResult = try DataFileReader(
+        let dataResult = try readData {
+            try DataFileReader(
                 url
             ).read(
                 options: .init(
-                    missingFilePolicy: options.missingFilePolicy
+                    missingFilePolicy: options.missingFilePolicy,
+                    cachePolicy: options.cachePolicy
                 )
             )
+        }
+
+        return try textResult(
+            from: dataResult,
+            options: options
+        )
+    }
+
+    public func read(
+        inspected metadata: FileMetadataSnapshot,
+        options: TextReadOptions = .default
+    ) throws -> TextReadResult {
+        let dataResult = try readData {
+            try DataFileReader(
+                url
+            ).read(
+                inspected: metadata,
+                options: .init(
+                    missingFilePolicy: options.missingFilePolicy,
+                    cachePolicy: options.cachePolicy
+                )
+            )
+        }
+
+        return try textResult(
+            from: dataResult,
+            options: options
+        )
+    }
+}
+
+private extension TextFileReader {
+    func readData(
+        _ operation: () throws -> DataReadResult
+    ) throws -> DataReadResult {
+        do {
+            return try operation()
         } catch let error as DataReadError {
             switch error {
             case .fileNotFound(let url):
@@ -36,7 +73,12 @@ public struct TextFileReader: Sendable {
                 )
             }
         }
+    }
 
+    func textResult(
+        from dataResult: DataReadResult,
+        options: TextReadOptions
+    ) throws -> TextReadResult {
         guard dataResult.existed else {
             return .init(
                 url: url,
@@ -74,9 +116,7 @@ public struct TextFileReader: Sendable {
             attemptedEncodingNames: attempted.map(\.name)
         )
     }
-}
 
-private extension TextFileReader {
     func normalized(
         _ text: String,
         using normalization: NewlineNormalization

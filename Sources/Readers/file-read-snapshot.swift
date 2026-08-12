@@ -1,4 +1,5 @@
 import Foundation
+import IO
 
 public struct FileReadSnapshot: Sendable, Hashable, Codable {
     public let metadata: FileMetadataSnapshot

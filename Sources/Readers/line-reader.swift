@@ -1,4 +1,5 @@
 import Foundation
+import IO
 import Position
 
 public struct LineReader: Sendable {
@@ -17,13 +18,22 @@ public struct LineReader: Sendable {
             options: options.text
         )
 
-        return .init(
-            url: url,
-            lines: splitLines(text.text),
-            encodingUsed: text.encodingUsed,
-            byteCount: text.byteCount,
-            existed: text.existed,
-            fileSnapshot: text.fileSnapshot
+        return lineResult(
+            from: text
+        )
+    }
+
+    public func read(
+        inspected metadata: FileMetadataSnapshot,
+        options: LineReadOptions = .default
+    ) throws -> LineReadResult {
+        let text = try TextFileReader(url).read(
+            inspected: metadata,
+            options: options.text
+        )
+
+        return lineResult(
+            from: text
         )
     }
 
@@ -41,6 +51,21 @@ public struct LineReader: Sendable {
     }
 
     public func readSlice(
+        inspected metadata: FileMetadataSnapshot,
+        range: LineRange?,
+        maxLines: Int? = nil,
+        options: LineReadOptions = .default
+    ) throws -> LineSliceReadResult {
+        try readSlice(
+            inspected: metadata,
+            startLine: range?.start,
+            endLine: range?.end,
+            maxLines: maxLines,
+            options: options
+        )
+    }
+
+    public func readSlice(
         startLine: Int? = nil,
         endLine: Int? = nil,
         maxLines: Int? = nil,
@@ -50,6 +75,42 @@ public struct LineReader: Sendable {
             options: options
         )
 
+        return sliceResult(
+            from: result,
+            startLine: startLine,
+            endLine: endLine,
+            maxLines: maxLines
+        )
+    }
+
+    public func readSlice(
+        inspected metadata: FileMetadataSnapshot,
+        startLine: Int? = nil,
+        endLine: Int? = nil,
+        maxLines: Int? = nil,
+        options: LineReadOptions = .default
+    ) throws -> LineSliceReadResult {
+        let result = try read(
+            inspected: metadata,
+            options: options
+        )
+
+        return sliceResult(
+            from: result,
+            startLine: startLine,
+            endLine: endLine,
+            maxLines: maxLines
+        )
+    }
+}
+
+private extension LineReader {
+    func sliceResult(
+        from result: LineReadResult,
+        startLine: Int?,
+        endLine: Int?,
+        maxLines: Int?
+    ) -> LineSliceReadResult {
         let totalLineCount = result.lineCount
 
         guard totalLineCount > 0 else {
@@ -66,7 +127,11 @@ public struct LineReader: Sendable {
             )
         }
 
-        let requestedStart = max(1, startLine ?? 1)
+        let requestedStart = max(
+            1,
+            startLine ?? 1
+        )
+
         let requestedEnd = min(
             totalLineCount,
             endLine ?? totalLineCount
@@ -88,7 +153,6 @@ public struct LineReader: Sendable {
 
         let lowerBound = requestedStart - 1
         var upperBound = requestedEnd
-
         var truncated = false
 
         if let maxLines, maxLines >= 0 {
@@ -102,6 +166,7 @@ public struct LineReader: Sendable {
         }
 
         let selectedLines: [String]
+
         if lowerBound < upperBound {
             selectedLines = Array(
                 result.lines[lowerBound..<upperBound]
@@ -111,6 +176,7 @@ public struct LineReader: Sendable {
         }
 
         let selectedLineRange: LineRange?
+
         if selectedLines.isEmpty {
             selectedLineRange = nil
         } else {
@@ -132,9 +198,20 @@ public struct LineReader: Sendable {
             fileSnapshot: result.fileSnapshot
         )
     }
-}
 
-private extension LineReader {
+    func lineResult(
+        from text: TextReadResult
+    ) -> LineReadResult {
+        .init(
+            url: url,
+            lines: splitLines(text.text),
+            encodingUsed: text.encodingUsed,
+            byteCount: text.byteCount,
+            existed: text.existed,
+            fileSnapshot: text.fileSnapshot
+        )
+    }
+
     func splitLines(
         _ text: String
     ) -> [String] {
