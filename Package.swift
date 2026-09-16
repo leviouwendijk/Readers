@@ -27,5 +27,12 @@ let package = Package(
                 .product(name: "FileTypes", package: "FileTypes"),
             ],
         ),
+        .executableTarget(
+            name: "ReadersTests",
+            dependencies: [
+                "Readers",
+                .product(name: "Position", package: "Position"),
+            ]
+        ),
     ]
 )

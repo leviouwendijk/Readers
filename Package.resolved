@@ -1,5 +1,5 @@
 {
-  "originHash" : "b4c1cd37a9a386c6dc2c67982b443823c22990ed998893b8aa47dbdf8e75b003",
+  "originHash" : "9d6fef1fc1583e1d30e478b473e085daab899acce293c969db450e4edd5008f6",
   "pins" : [
     {
       "identity" : "filetypes",
@@ -16,7 +16,7 @@
       "location" : "https://github.com/leviouwendijk/IO.git",
       "state" : {
         "branch" : "master",
-        "revision" : "4cd73c07e948b6520ba912b08eb5f132aaa81775"
+        "revision" : "cb8775249cb785f25ddee26caeae6c2db07eaa2e"
       }
     },
     {
@@ -25,7 +25,7 @@
       "location" : "https://github.com/leviouwendijk/Position.git",
       "state" : {
         "branch" : "master",
-        "revision" : "c80214283130c1bd4fc1c54dd5f3c574e3e4986c"
+        "revision" : "23c0ec4218a64853830a9448a97b756731e0afab"
       }
     }
   ],
