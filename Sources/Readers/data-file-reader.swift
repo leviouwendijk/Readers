@@ -67,10 +67,12 @@ public struct DataFileReader: Sendable {
         let data: Data
 
         do {
-            data = try Data(
-                contentsOf: url,
-                options: options.cachePolicy.dataReadingOptions
+            data = try systemData(
+                expectedByteCount: metadata.byteCount,
+                cachePolicy: options.cachePolicy
             )
+        } catch let error as DataReadError {
+            throw error
         } catch {
             throw DataReadError.io(
                 url,
@@ -120,19 +122,68 @@ public struct DataFileReader: Sendable {
     }
 }
 
-private extension FileReadCachePolicy {
-    var dataReadingOptions: Data.ReadingOptions {
-        switch self {
-        case .system:
-            return []
+private extension DataFileReader {
+    func systemData(
+        expectedByteCount: Int?,
+        cachePolicy: FileReadCachePolicy
+    ) throws -> Data {
+        var source = Source(
+            try SystemFileSource(
+                path: url.path,
+                cachePolicy: cachePolicy
+            )
+        )
+        var data = Data()
 
-        case .uncached:
-            return [.uncached]
+        if let expectedByteCount,
+           expectedByteCount > 0
+        {
+            data.reserveCapacity(
+                expectedByteCount
+            )
+        }
+
+        while true {
+            switch try source.prepare() {
+            case .bytes:
+                let count = source.bufferedByteCount
+
+                source.withReadableRegions {
+                    first,
+                    second in
+
+                    data.append(
+                        contentsOf: first
+                    )
+                    data.append(
+                        contentsOf: second
+                    )
+                }
+
+                try source.consume(
+                    count
+                )
+
+            case .end:
+                return data
+
+            case .unavailable:
+                throw DataReadError.io(
+                    url,
+                    message:
+                        "Synchronous file source became unavailable."
+                )
+
+            case .buffer_full:
+                throw DataReadError.io(
+                    url,
+                    message:
+                        "Synchronous file source could not expose readable capacity."
+                )
+            }
         }
     }
-}
 
-private extension DataFileReader {
     func base64Result(
         from result: DataReadResult
     ) -> Base64ReadResult {

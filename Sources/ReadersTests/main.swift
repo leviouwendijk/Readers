@@ -78,5 +78,80 @@ func lineReadResultMaterializesRangesInMemory() throws {
     )
 }
 
+func dataFileReaderUsesIOSystemSource() throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent(
+            "readers-system-source-\(UUID().uuidString)",
+            isDirectory: true
+        )
+    let file = root.appendingPathComponent(
+        "payload.bin",
+        isDirectory: false
+    )
+
+    try FileManager.default.createDirectory(
+        at: root,
+        withIntermediateDirectories: true
+    )
+    defer {
+        try? FileManager.default.removeItem(
+            at: root
+        )
+    }
+
+    let payload = Data(
+        (0..<(128 * 1024)).map {
+            UInt8(
+                truncatingIfNeeded: $0
+            )
+        }
+    )
+
+    try payload.write(
+        to: file
+    )
+
+    let uncached = try DataFileReader(
+        file
+    ).read()
+
+    try expect(
+        uncached.data == payload,
+        "default uncached DataFileReader preserves payload"
+    )
+    try expect(
+        uncached.byteCount == payload.count,
+        "default uncached DataFileReader preserves byte count"
+    )
+
+    let systemCached = try DataFileReader(
+        file
+    ).read(
+        options: .init(
+            cachePolicy: .system
+        )
+    )
+
+    try expect(
+        systemCached.data == payload,
+        "system-cache DataFileReader preserves payload"
+    )
+    guard
+        let systemSnapshot = systemCached.fileSnapshot,
+        let uncachedSnapshot = uncached.fileSnapshot
+    else {
+        throw RegressionFailure.assertion(
+            "existing DataFileReader result must carry a file snapshot"
+        )
+    }
+
+    try expect(
+        systemSnapshot.contentFingerprint
+            == uncachedSnapshot.contentFingerprint,
+        "IO-backed cache policies preserve fingerprint"
+    )
+}
+
 try lineReadResultMaterializesRangesInMemory()
+try dataFileReaderUsesIOSystemSource()
 print("ReadersTests: passed")
