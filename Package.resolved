@@ -16,7 +16,7 @@
       "location" : "https://github.com/leviouwendijk/IO.git",
       "state" : {
         "branch" : "master",
-        "revision" : "cb8775249cb785f25ddee26caeae6c2db07eaa2e"
+        "revision" : "024393599fed6729b956293e7b4219d96ea90b05"
       }
     },
     {
@@ -25,7 +25,7 @@
       "location" : "https://github.com/leviouwendijk/Position.git",
       "state" : {
         "branch" : "master",
-        "revision" : "23c0ec4218a64853830a9448a97b756731e0afab"
+        "revision" : "491376735af3ef7417b989e38c508577fb72637a"
       }
     }
   ],
