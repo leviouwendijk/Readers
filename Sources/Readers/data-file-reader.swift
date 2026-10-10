@@ -135,8 +135,9 @@ private extension DataFileReader {
         )
         var data = Data()
 
-        if let expectedByteCount,
-           expectedByteCount > 0
+        if 
+            let expectedByteCount,
+            expectedByteCount > 0
         {
             data.reserveCapacity(
                 expectedByteCount
@@ -148,16 +149,25 @@ private extension DataFileReader {
             case .bytes:
                 let count = source.bufferedByteCount
 
-                source.withReadableRegions {
-                    first,
-                    second in
+                 // source.withReadableRegions {
+                 //     first,
+                 //     second in
 
-                    data.append(
-                        contentsOf: first
-                    )
-                    data.append(
-                        contentsOf: second
-                    )
+                 //     data.append(
+                 //         contentsOf: first
+                 //     )
+                 //     data.append(
+                 //         contentsOf: second
+                 //     )
+                // }
+
+                source.withReadableRegions { first, second in
+                    first.withUnsafeBytes { bytes in
+                        data.append(contentsOf: bytes)
+                    }
+                    second.withUnsafeBytes { bytes in
+                        data.append(contentsOf: bytes)
+                    }
                 }
 
                 try source.consume(
@@ -170,15 +180,13 @@ private extension DataFileReader {
             case .unavailable:
                 throw DataReadError.io(
                     url,
-                    message:
-                        "Synchronous file source became unavailable."
+                    message: "Synchronous file source became unavailable."
                 )
 
             case .buffer_full:
                 throw DataReadError.io(
                     url,
-                    message:
-                        "Synchronous file source could not expose readable capacity."
+                    message: "Synchronous file source could not expose readable capacity."
                 )
             }
         }
