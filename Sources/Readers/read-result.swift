@@ -77,6 +77,94 @@ public struct LineReadResult: Sendable, Hashable, Codable {
             end: lines.count
         )
     }
+    /// Lines of `text`, split exactly as `LineReader` splits a file.
+    public init(
+        url: URL,
+        text: String,
+        encodingUsed: TextEncoding?,
+        byteCount: Int,
+        existed: Bool,
+        fileSnapshot: FileReadSnapshot? = nil
+    ) {
+        self.init(
+            url: url,
+            lines: text.isEmpty
+                ? []
+                : text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init),
+            encodingUsed: encodingUsed,
+            byteCount: byteCount,
+            existed: existed,
+            fileSnapshot: fileSnapshot
+        )
+    }
+
+    /// A window of these lines, 1-based and inclusive; `maxLines` truncates.
+    public func slice(
+        startLine: Int? = nil,
+        endLine: Int? = nil,
+        maxLines: Int? = nil
+    ) -> LineSliceReadResult {
+        let totalLineCount = lineCount
+
+        guard totalLineCount > 0 else {
+            return .init(
+                url: url,
+                selectedLines: [],
+                selectedLineRange: nil,
+                totalLineCount: 0,
+                truncated: false,
+                encodingUsed: encodingUsed,
+                byteCount: byteCount,
+                existed: existed,
+                fileSnapshot: fileSnapshot
+            )
+        }
+
+        let requestedStart = max(1, startLine ?? 1)
+        let requestedEnd = min(totalLineCount, endLine ?? totalLineCount)
+
+        guard requestedEnd >= requestedStart else {
+            return .init(
+                url: url,
+                selectedLines: [],
+                selectedLineRange: nil,
+                totalLineCount: totalLineCount,
+                truncated: false,
+                encodingUsed: encodingUsed,
+                byteCount: byteCount,
+                existed: existed,
+                fileSnapshot: fileSnapshot
+            )
+        }
+
+        let lowerBound = requestedStart - 1
+        var upperBound = requestedEnd
+        var truncated = false
+
+        if let maxLines, maxLines >= 0 {
+            let limitedUpperBound = min(upperBound, lowerBound + maxLines)
+            truncated = limitedUpperBound < upperBound
+            upperBound = limitedUpperBound
+        }
+
+        let selectedLines = lowerBound < upperBound
+            ? Array(lines[lowerBound..<upperBound])
+            : []
+
+        return .init(
+            url: url,
+            selectedLines: selectedLines,
+            selectedLineRange: selectedLines.isEmpty
+                ? nil
+                : try? LineRange(start: lowerBound + 1, end: upperBound),
+            totalLineCount: totalLineCount,
+            truncated: truncated,
+            encodingUsed: encodingUsed,
+            byteCount: byteCount,
+            existed: existed,
+            fileSnapshot: fileSnapshot
+        )
+    }
 }
 
 public struct LineSliceReadResult: Sendable, Hashable, Codable {

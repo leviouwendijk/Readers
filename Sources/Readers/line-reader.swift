@@ -111,91 +111,10 @@ private extension LineReader {
         endLine: Int?,
         maxLines: Int?
     ) -> LineSliceReadResult {
-        let totalLineCount = result.lineCount
-
-        guard totalLineCount > 0 else {
-            return .init(
-                url: url,
-                selectedLines: [],
-                selectedLineRange: nil,
-                totalLineCount: 0,
-                truncated: false,
-                encodingUsed: result.encodingUsed,
-                byteCount: result.byteCount,
-                existed: result.existed,
-                fileSnapshot: result.fileSnapshot
-            )
-        }
-
-        let requestedStart = max(
-            1,
-            startLine ?? 1
-        )
-
-        let requestedEnd = min(
-            totalLineCount,
-            endLine ?? totalLineCount
-        )
-
-        guard requestedEnd >= requestedStart else {
-            return .init(
-                url: url,
-                selectedLines: [],
-                selectedLineRange: nil,
-                totalLineCount: totalLineCount,
-                truncated: false,
-                encodingUsed: result.encodingUsed,
-                byteCount: result.byteCount,
-                existed: result.existed,
-                fileSnapshot: result.fileSnapshot
-            )
-        }
-
-        let lowerBound = requestedStart - 1
-        var upperBound = requestedEnd
-        var truncated = false
-
-        if let maxLines, maxLines >= 0 {
-            let limitedUpperBound = min(
-                upperBound,
-                lowerBound + maxLines
-            )
-
-            truncated = limitedUpperBound < upperBound
-            upperBound = limitedUpperBound
-        }
-
-        let selectedLines: [String]
-
-        if lowerBound < upperBound {
-            selectedLines = Array(
-                result.lines[lowerBound..<upperBound]
-            )
-        } else {
-            selectedLines = []
-        }
-
-        let selectedLineRange: LineRange?
-
-        if selectedLines.isEmpty {
-            selectedLineRange = nil
-        } else {
-            selectedLineRange = try? LineRange(
-                start: lowerBound + 1,
-                end: upperBound
-            )
-        }
-
-        return .init(
-            url: url,
-            selectedLines: selectedLines,
-            selectedLineRange: selectedLineRange,
-            totalLineCount: totalLineCount,
-            truncated: truncated,
-            encodingUsed: result.encodingUsed,
-            byteCount: result.byteCount,
-            existed: result.existed,
-            fileSnapshot: result.fileSnapshot
+        result.slice(
+            startLine: startLine,
+            endLine: endLine,
+            maxLines: maxLines
         )
     }
 
@@ -204,26 +123,11 @@ private extension LineReader {
     ) -> LineReadResult {
         .init(
             url: url,
-            lines: splitLines(text.text),
+            text: text.text,
             encodingUsed: text.encodingUsed,
             byteCount: text.byteCount,
             existed: text.existed,
             fileSnapshot: text.fileSnapshot
         )
-    }
-
-    func splitLines(
-        _ text: String
-    ) -> [String] {
-        guard !text.isEmpty else {
-            return []
-        }
-
-        return text
-            .split(
-                separator: "\n",
-                omittingEmptySubsequences: false
-            )
-            .map(String.init)
     }
 }
