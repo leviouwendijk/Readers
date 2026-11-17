@@ -11,24 +11,15 @@ public struct DataFileReader: Sendable {
         self.url = url
     }
 
+    /// `open` + `fstat` + reads + `close`: no separate inspection. The snapshot
+    /// is the opened descriptor's, so it describes exactly the bytes read
+    /// (symlinks followed); a missing path or dangling link applies
+    /// `missingFilePolicy`.
     public func read(
         options: DataReadOptions = .default
     ) throws -> DataReadResult {
-        let metadata: FileMetadataSnapshot
-
-        do {
-            metadata = try FileInspector(
-                url
-            ).inspect()
-        } catch {
-            throw DataReadError.io(
-                url,
-                message: error.localizedDescription
-            )
-        }
-
-        return try read(
-            inspected: metadata,
+        try readOpened(
+            expected: nil,
             options: options
         )
     }
@@ -45,53 +36,28 @@ public struct DataFileReader: Sendable {
         }
 
         guard metadata.existed else {
-            switch options.missingFilePolicy {
-            case .throwError:
-                throw DataReadError.fileNotFound(url)
-
-            case .returnEmpty:
-                return .init(
-                    url: url,
-                    data: Data(),
-                    fileType: inferredFileType,
-                    byteCount: 0,
-                    existed: false,
-                    fileSnapshot: .init(
-                        metadata: metadata,
-                        contentFingerprint: nil
-                    )
-                )
-            }
-        }
-
-        let data: Data
-
-        do {
-            data = try systemData(
-                expectedByteCount: metadata.byteCount,
-                cachePolicy: options.cachePolicy
-            )
-        } catch let error as DataReadError {
-            throw error
-        } catch {
-            throw DataReadError.io(
-                url,
-                message: error.localizedDescription
-            )
-        }
-
-        return .init(
-            url: url,
-            data: data,
-            fileType: inferredFileType,
-            byteCount: data.count,
-            existed: true,
-            fileSnapshot: .init(
+            return try missing(
                 metadata: metadata,
-                contentFingerprint: .fingerprint(
-                    for: data
-                )
+                options: options
             )
+        }
+
+        // A symlink snapshot (caller inspected without following) is resolved by
+        // the open; other non-regular kinds are refused without opening.
+        if let kind = metadata.kind,
+           kind != .file,
+           kind != .symlink
+        {
+            throw notRegularFile(
+                kind
+            )
+        }
+
+        return try readOpened(
+            expected: metadata.kind == .file
+                ? metadata.identity
+                : nil,
+            options: options
         )
     }
 
@@ -123,21 +89,127 @@ public struct DataFileReader: Sendable {
 }
 
 private extension DataFileReader {
-    func systemData(
-        expectedByteCount: Int?,
-        cachePolicy: FileReadCachePolicy
-    ) throws -> Data {
-        var source = Source(
-            try SystemFileSource(
-                path: url.path,
-                cachePolicy: cachePolicy
+    /// `expected`: identity of a regular file the caller inspected; a different
+    /// opened file means the caller's snapshot describes other bytes.
+    func readOpened(
+        expected: FileIdentity?,
+        options: DataReadOptions
+    ) throws -> DataReadResult {
+        let read: (data: Data, metadata: FileMetadataSnapshot)
+
+        do {
+            read = try systemData(
+                cachePolicy: options.cachePolicy
             )
+        } catch SystemFileSourceError.open(_, let code)
+            where code == ENOENT || code == ENOTDIR
+        {
+            // Missing, removed since inspection, or a dangling symlink.
+            return try missing(
+                metadata: .init(
+                    url: url,
+                    existed: false,
+                    byteCount: nil,
+                    modifiedAt: nil,
+                    identity: nil,
+                    kind: nil
+                ),
+                options: options
+            )
+        } catch let error as DataReadError {
+            throw error
+        } catch {
+            throw DataReadError.io(
+                url,
+                message: error.localizedDescription
+            )
+        }
+
+        if let expected,
+           read.metadata.identity != expected
+        {
+            throw DataReadError.io(
+                url,
+                message: "File was replaced between inspection and read."
+            )
+        }
+
+        return .init(
+            url: url,
+            data: read.data,
+            fileType: inferredFileType,
+            byteCount: read.data.count,
+            existed: true,
+            fileSnapshot: .init(
+                metadata: read.metadata,
+                contentFingerprint: .fingerprint(
+                    for: read.data
+                )
+            )
+        )
+    }
+
+    func missing(
+        metadata: FileMetadataSnapshot,
+        options: DataReadOptions
+    ) throws -> DataReadResult {
+        switch options.missingFilePolicy {
+        case .throwError:
+            throw DataReadError.fileNotFound(url)
+
+        case .returnEmpty:
+            return .init(
+                url: url,
+                data: Data(),
+                fileType: inferredFileType,
+                byteCount: 0,
+                existed: false,
+                fileSnapshot: .init(
+                    metadata: metadata,
+                    contentFingerprint: nil
+                )
+            )
+        }
+    }
+
+    func notRegularFile(
+        _ kind: FileKind
+    ) -> DataReadError {
+        .io(
+            url,
+            message: "Not a regular file (\(kind))."
+        )
+    }
+
+    /// `open(O_NONBLOCK)` + `fstat`, then reads: the same syscall count as an
+    /// `lstat` before `open`, but the metadata is the opened descriptor's.
+    /// `O_NONBLOCK` keeps a FIFO from hanging the open; it is refused by kind
+    /// before any read. Regular-file reads are unaffected by the flag.
+    func systemData(
+        cachePolicy: FileReadCachePolicy
+    ) throws -> (data: Data, metadata: FileMetadataSnapshot) {
+        let backend = try SystemFileSource(
+            path: url.path,
+            cachePolicy: cachePolicy,
+            openNonblocking: true
+        )
+        let metadata = try backend.inspect(
+            url: url
+        )
+
+        guard metadata.kind == .file else {
+            throw notRegularFile(
+                metadata.kind ?? .other
+            )
+        }
+
+        var source = Source(
+            backend
         )
         var data = Data()
 
-        if 
-            let expectedByteCount,
-            expectedByteCount > 0
+        if let expectedByteCount = metadata.byteCount,
+           expectedByteCount > 0
         {
             data.reserveCapacity(
                 expectedByteCount
@@ -175,7 +247,7 @@ private extension DataFileReader {
                 )
 
             case .end:
-                return data
+                return (data, metadata)
 
             case .unavailable:
                 throw DataReadError.io(
